@@ -1,5 +1,5 @@
 flet
 pandas
 openpyxl
-uvicorn
 gunicorn
+uvicorn[standard]
