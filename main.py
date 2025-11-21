@@ -264,10 +264,5 @@ def main(page: ft.Page):
         btn_export
     )
 
-if __name__ == "__main__":
-    print("🚀 程式開始執行...")
-    try:
-        ft.app(target=main)
-    except Exception as e:
-        print(f"❌ 發生錯誤: {e}")
-        input("按 Enter 鍵離開...")
+# --- 雲端部署專用設定 ---
+app = ft.app(target=main, export_asgi_app=True)
