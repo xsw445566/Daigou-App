@@ -7,7 +7,7 @@ def main(page: ft.Page):
     print("✅ APP 正在啟動畫面中...") 
     
     # --- 基本設定 ---
-    page.title = "代購小幫手 (網頁/手機通用版)"
+    page.title = "代購小幫手 (手機下載修復版)"
     page.window_width = 480
     page.window_height = 850
     page.scroll = "auto"
@@ -15,38 +15,9 @@ def main(page: ft.Page):
 
     orders = [] 
 
-    # ==========================================
-    # 👇👇👇 修改重點 1：定義存檔後的動作 👇👇👇
-    # ==========================================
-    def save_file_result(e: ft.FilePickerResultEvent):
-        # 如果使用者有選擇路徑 (沒有按取消)
-        if e.path:
-            try:
-                df = pd.DataFrame(orders)
-                # Excel 欄位順序
-                cols = ["購買人", "商品名稱", "備註", "台幣總價", "付款狀態", "已付訂金", "待付尾款", "日幣", "計算匯率", "額外費用", "累積金額", "網址", "時間"]
-                
-                # 確保欄位存在
-                for col in cols:
-                    if col not in df.columns: df[col] = ""
-                df = df[cols]
-                
-                # 存檔
-                df.to_excel(e.path, index=False)
-                
-                page.snack_bar = ft.SnackBar(ft.Text(f"✅ 檔案已儲存！"))
-                page.snack_bar.open = True
-                page.update()
-            except Exception as ex:
-                page.snack_bar = ft.SnackBar(ft.Text(f"❌ 儲存失敗: {ex}"))
-                page.snack_bar.open = True
-                page.update()
-
-    # ==========================================
-    # 👇👇👇 修改重點 2：註冊檔案選擇器 👇👇👇
-    # ==========================================
-    save_file_dialog = ft.FilePicker(on_result=save_file_result)
-    page.overlay.append(save_file_dialog) # 把選擇器掛載到頁面上
+    # 確保雲端上有一個 assets 資料夾可以用來暫存 Excel
+    if not os.path.exists("assets"):
+        os.makedirs("assets")
 
     # --- 邏輯函數 ---
 
@@ -190,7 +161,7 @@ def main(page: ft.Page):
         page.update()
 
     # ==========================================
-    # 👇👇👇 修改重點 3：修改匯出按鈕行為 👇👇👇
+    # 👇👇👇 修改重點：直接生成連結下載 👇👇👇
     # ==========================================
     def export_click(e):
         if not orders:
@@ -199,15 +170,33 @@ def main(page: ft.Page):
             page.update()
             return
         
-        # 產生預設檔名
-        default_filename = f"代購_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-        
-        # 打開儲存視窗 (電腦上會跳窗，網頁上會下載)
-        save_file_dialog.save_file(
-            dialog_title="請選擇儲存位置 (或下載檔案)",
-            file_name=default_filename,
-            allowed_extensions=["xlsx"]
-        )
+        try:
+            # 1. 產生檔案名稱 (使用時間戳記避免重複)
+            filename = f"Daigou_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            
+            # 2. 存到 assets 資料夾 (雲端主機的暫存區)
+            filepath = os.path.join("assets", filename)
+            
+            # 3. 製作 Excel
+            df = pd.DataFrame(orders)
+            cols = ["購買人", "商品名稱", "備註", "台幣總價", "付款狀態", "已付訂金", "待付尾款", "日幣", "計算匯率", "額外費用", "累積金額", "網址", "時間"]
+            for col in cols:
+                if col not in df.columns: df[col] = ""
+            df = df[cols]
+            df.to_excel(filepath, index=False)
+            
+            # 4. 命令瀏覽器直接打開這個檔案 (會觸發下載)
+            page.launch_url(f"/{filename}")
+            
+            page.snack_bar = ft.SnackBar(ft.Text("✅ 正在下載 Excel..."))
+            page.snack_bar.open = True
+            page.update()
+            
+        except Exception as ex:
+            page.snack_bar = ft.SnackBar(ft.Text(f"❌ 錯誤: {ex}"))
+            page.snack_bar.open = True
+            page.update()
+
 
     # --- UI 元件設計 ---
     
@@ -247,7 +236,7 @@ def main(page: ft.Page):
     btn_export = ft.ElevatedButton("匯出 Excel (下載)", icon="file_download", on_click=export_click, bgcolor="green", color="white", height=50, width=450)
 
     page.add(
-        ft.Text("🇯🇵 代購系統 (通用版)", size=25, weight="bold", text_align="center"),
+        ft.Text("🇯🇵 代購系統 (手機版)", size=25, weight="bold", text_align="center"),
         rate_section,
         ft.Divider(height=10, color="transparent"),
         buyer_row,
@@ -264,5 +253,5 @@ def main(page: ft.Page):
         btn_export
     )
 
-# --- 雲端部署專用設定 ---
-app = ft.app(target=main, export_asgi_app=True)
+# 👇👇👇 修改重點：加入 assets_dir，告訴雲端這裡面放的是要給人下載的檔案
+app = ft.app(target=main, export_asgi_app=True, assets_dir="assets")
